@@ -1,17 +1,3 @@
--- ============================================================
--- WORKLOAD OLAP — Il Potere d'Acquisto del Tech Worker
--- Data Management A.A. 2025/26 — Smisi, Pietrobono
--- Database: dw_techworker (star schema, Fase 3)
---
--- Ogni query indica l'operazione OLAP che dimostra.
--- Misure NON additive: aggregazione con mediana
--- (percentile_cont), mai SUM. Soglia n>=30 = regola R4.
--- ============================================================
-
--- ------------------------------------------------------------
--- V0. Vista di supporto: fatti analizzabili + dimensione geografica
---     (esclude i comp_adjusted NULL — regola L6)
--- ------------------------------------------------------------
 CREATE OR REPLACE VIEW v_fact_geo AS
 SELECT f.*, g.country_name, g.sub_region, g.region, g.col_index
 FROM fact_survey_response f
@@ -19,10 +5,7 @@ JOIN dim_geography g USING (geography_key)
 WHERE f.comp_adjusted IS NOT NULL;
 
 
--- ------------------------------------------------------------
--- Q1. LA BUSINESS QUESTION  [aggregazione + slice implicito R4]
---     Top 15 paesi per potere d'acquisto mediano
--- ------------------------------------------------------------
+-- Q1: top 15 paesi per mediana di potere d'acquisto, soglia 30 rispondenti
 SELECT country_name,
        count(*)                                                       AS n,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY comp_usd)::numeric, 0)      AS mediana_usd,
@@ -34,10 +17,7 @@ ORDER BY mediana_adj DESC
 LIMIT 15;
 
 
--- ------------------------------------------------------------
--- Q2. NOMINALE vs REALE  [window function: RANK]
---     Chi guadagna/perde posizioni aggiustando per il costo della vita?
--- ------------------------------------------------------------
+-- Q2: confronto tra ranking nominale e reale con window function
 WITH per_paese AS (
     SELECT country_name,
            count(*) AS n,
@@ -59,11 +39,7 @@ ORDER BY posizioni_guadagnate DESC, mediana_adj DESC
 LIMIT 20;
 
 
--- ------------------------------------------------------------
--- Q3. ROLL-UP sulla gerarchia geografica  [ROLLUP: country->sub_region->region]
---     Il GROUP BY ROLLUP produce tutti i livelli + totale generale;
---     GROUPING() distingue i subtotali.
--- ------------------------------------------------------------
+-- Q3: roll up su region e sub region con GROUP BY ROLLUP
 SELECT CASE GROUPING(region)     WHEN 1 THEN '** MONDO **' ELSE region END     AS region,
        CASE GROUPING(sub_region) WHEN 1 THEN '(tutte)'     ELSE sub_region END AS sub_region,
        count(*) AS n,
@@ -73,10 +49,7 @@ GROUP BY ROLLUP (region, sub_region)
 ORDER BY GROUPING(region), region, GROUPING(sub_region), mediana_adj DESC;
 
 
--- ------------------------------------------------------------
--- Q4. PIVOT esperienza x region  [dice su due dimensioni]
---     Dove conviene essere junior? E senior?
--- ------------------------------------------------------------
+-- Q4: mediana per fascia di esperienza incrociata con region
 SELECT e.experience_band,
        g.region,
        count(*) AS n,
@@ -91,26 +64,20 @@ HAVING count(*) >= 30
 ORDER BY e.experience_band, mediana_adj DESC;
 
 
--- ------------------------------------------------------------
--- Q5. SLICE + DRILL-DOWN  [slice su dev_type, dettaglio per paese]
---     Classifica paesi per gli sviluppatori full-stack
--- ------------------------------------------------------------
+-- Q5: classifica paesi solo per sviluppatori full stack
 SELECT v.country_name,
        count(*) AS n,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY v.comp_adjusted)::numeric, 0) AS mediana_adj
 FROM v_fact_geo v
 JOIN dim_devtype d USING (devtype_key)
-WHERE d.devtype_name = 'Developer, full-stack'          -- SLICE
+WHERE d.devtype_name = 'Developer, full-stack'
 GROUP BY v.country_name
 HAVING count(*) >= 30
 ORDER BY mediana_adj DESC
 LIMIT 10;
 
 
--- ------------------------------------------------------------
--- Q6. REMOTE vs IN-PERSON  [FILTER: aggregati condizionali affiancati]
---     Differenziale di potere d'acquisto per region
--- ------------------------------------------------------------
+-- Q6: confronto remote e in person nella stessa riga con FILTER
 SELECT g.region,
        count(*) FILTER (WHERE r.work_mode = 'Remote')    AS n_remote,
        count(*) FILTER (WHERE r.work_mode = 'In-person') AS n_inperson,
@@ -128,13 +95,7 @@ HAVING count(*) FILTER (WHERE r.work_mode = 'Remote') >= 30
 ORDER BY med_adj_remote DESC;
 
 
--- ------------------------------------------------------------
--- Q7. BRIDGE: analisi per linguaggio  [arco multiplo]
---     Salario reale mediano di chi usa ciascun linguaggio.
---     NB anti doppio-conteggio: ogni fatto compare in N gruppi
---     (uno per linguaggio conosciuto). Legittimo aggregare
---     ENTRO il linguaggio; vietato sommare TRA linguaggi.
--- ------------------------------------------------------------
+-- Q7: mediana per linguaggio tramite la bridge table
 SELECT l.language_name,
        count(*) AS n_rispondenti,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY v.comp_adjusted)::numeric, 0) AS mediana_adj
@@ -147,51 +108,35 @@ ORDER BY mediana_adj DESC
 LIMIT 15;
 
 
--- ------------------------------------------------------------
--- Q8. ROBUSTEZZA  [slice su employment]
---     La Top 10 di Q1 regge considerando solo i full-time puri?
--- ------------------------------------------------------------
+-- Q8: stessa top 10 di Q1 ma solo full time, verifica di robustezza
 SELECT v.country_name,
        count(*) AS n,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY v.comp_adjusted)::numeric, 0) AS mediana_adj
 FROM v_fact_geo v
 JOIN dim_employment e USING (employment_key)
-WHERE e.employment_status = 'Employed, full-time'       -- SLICE
+WHERE e.employment_status = 'Employed, full-time'
 GROUP BY v.country_name
 HAVING count(*) >= 30
 ORDER BY mediana_adj DESC
 LIMIT 10;
 
 
--- ------------------------------------------------------------
--- Q9. VERIFICA BIAS DEL ROLL-UP  [confronto tra due schemi di aggregazione]
---     Q3/D4 fa percentile_cont sulle righe individuali pooled per
---     region: il peso di ogni paese nell'aggregato è quindi
---     proporzionale a quanti suoi cittadini hanno risposto al
---     survey, non alla reale distribuzione della forza lavoro tech
---     nel mondo (Stack Overflow non e' un campione rappresentativo:
---     skew noto verso USA/Europa). Qui calcoliamo anche la versione
---     "a peso uguale per paese": prima la mediana per paese (come
---     Q1), poi la mediana di QUELLE mediane. La numerosita' del
---     paese non conta piu', ogni paese pesa 1, non n.
--- ------------------------------------------------------------
-
--- 9a. per region
+-- Q9a: mediana pooled contro mediana a pesi uguali per region
 WITH country_medians AS (
     SELECT country_name, region,
            count(*) AS n,
            percentile_cont(0.5) WITHIN GROUP (ORDER BY comp_adjusted) AS country_med_adj
     FROM v_fact_geo
     GROUP BY country_name, region
-    HAVING count(*) >= 30                                   -- stessa soglia R4
+    HAVING count(*) >= 30
 ),
-pooled AS (                                                  -- metodo attuale (Q3/D4)
+pooled AS (
     SELECT region,
            percentile_cont(0.5) WITHIN GROUP (ORDER BY comp_adjusted) AS pooled_median
     FROM v_fact_geo
     GROUP BY region
 ),
-equal_weighted AS (                                          -- alternativa: 1 paese = 1 voto
+equal_weighted AS (
     SELECT region,
            count(*) AS n_paesi,
            percentile_cont(0.5) WITHIN GROUP (ORDER BY country_med_adj) AS eq_weighted_median
@@ -207,7 +152,7 @@ FROM pooled p
 JOIN equal_weighted ew USING (region)
 ORDER BY scarto DESC;
 
--- 9b. livello mondo (una sola riga)
+-- Q9b: stesso confronto ma a livello mondo, una sola riga
 WITH country_medians AS (
     SELECT country_name,
            percentile_cont(0.5) WITHIN GROUP (ORDER BY comp_adjusted) AS country_med_adj
@@ -222,8 +167,7 @@ SELECT
    FROM country_medians)                                                     AS mondo_country_equal_weighted,
   (SELECT count(*) FROM country_medians)                                     AS n_paesi;
 
--- 9c. per sub_region:  test diretto della claim di slide 11
---     ("Eastern Europe overtakes Western Europe in real terms")
+-- Q9c: stesso confronto ma per sub region, verifica diretta su Est e Ovest Europa
 WITH country_medians AS (
     SELECT country_name, sub_region,
            count(*) AS n,

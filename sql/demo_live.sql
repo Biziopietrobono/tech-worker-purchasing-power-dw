@@ -1,26 +1,13 @@
--- ============================================================
--- DEMO LIVE (5 minuti) — Il Potere d'Acquisto del Tech Worker
--- Smisi, Pietrobono — Data Management A.A. 2025/26
--- Eseguire in ordine D1 -> D5. Ogni query e' autonoma.
--- Prerequisito: vista v_fact_geo gia' creata (olap_queries.sql, V0)
--- ============================================================
-
--- ------------------------------------------------------------
--- "Questo e' il data warehouse"
--- Star schema popolato: fatto, 10 dimensioni, bridge
--- ------------------------------------------------------------
+-- D1: quante righe hanno le tabelle principali dello star schema
 SELECT 'fact_survey_response' AS tabella, count(*) AS righe, 'fatti (1 riga = 1 rispondente)' AS ruolo FROM fact_survey_response
-UNION ALL SELECT 'bridge_response_language', count(*), 'molti-a-molti linguaggi'  FROM bridge_response_language
-UNION ALL SELECT 'dim_geography',  count(*), 'gerarchia country->sub_region->region + indici Numbeo' FROM dim_geography
-UNION ALL SELECT 'dim_experience', count(*), 'gerarchia anni->fascia'   FROM dim_experience
+UNION ALL SELECT 'bridge_response_language', count(*), 'molti a molti linguaggi'  FROM bridge_response_language
+UNION ALL SELECT 'dim_geography',  count(*), 'gerarchia country, sub_region, region + indici Numbeo' FROM dim_geography
+UNION ALL SELECT 'dim_experience', count(*), 'gerarchia anni, fascia'   FROM dim_experience
 UNION ALL SELECT 'dim_language',   count(*), 'dimensione del bridge'    FROM dim_language
 ORDER BY righe DESC;
 
 
--- ------------------------------------------------------------
---  "Un fatto, tutto lo schema": join a stella
--- + la misura derivata comp_adjusted calcolata in ETL
--- ------------------------------------------------------------
+-- D2: un fatto, tutto lo schema, caso Georgia
 SELECT f.response_id,
        g.country_name, g.sub_region,
        e.experience_band,
@@ -28,7 +15,7 @@ SELECT f.response_id,
        r.work_mode,
        f.comp_usd,
        g.col_index,
-       f.comp_adjusted            -- = comp_usd / (col_index/100)
+       f.comp_adjusted
 FROM fact_survey_response f
 JOIN dim_geography  g USING (geography_key)
 JOIN dim_experience e USING (experience_key)
@@ -39,10 +26,7 @@ ORDER BY f.comp_adjusted DESC
 LIMIT 5;
 
 
--- ------------------------------------------------------------
--- LA BUSINESS QUESTION
--- Top 10 paesi per potere d'acquisto mediano (soglia n>=30)
--- ------------------------------------------------------------
+-- D3: top 10 paesi per potere d'acquisto mediano, la domanda del progetto
 SELECT country_name,
        count(*) AS n,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY comp_usd)::numeric, 0)      AS mediana_usd,
@@ -54,28 +38,17 @@ ORDER BY mediana_reale DESC
 LIMIT 10;
 
 
--- ------------------------------------------------------------
--- ROLL-UP sulla gerarchia del DFM
--- GROUP BY ROLLUP = tutti i livelli di aggregazione in una query
--- ATTENZIONE: questo pooling pesa ogni paese per numero di
--- rispondenti, non per realta'. Vedi Q9 in olap_queries.sql:
--- a pesi uguali per paese il risultato Est/Ovest si ribalta.
--- ------------------------------------------------------------
--- NB: il WHERE agisce PRIMA del ROLLUP, quindi il subtotale
---     e' correttamente "totale Europa" (non "mondo").
+-- D4: slice sull'Europa più roll-up sulla gerarchia con GROUP BY ROLLUP
 SELECT COALESCE(sub_region, '** TOTALE EUROPA **') AS sub_region,
        count(*) AS n,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY comp_adjusted)::numeric, 0) AS mediana_reale
 FROM v_fact_geo
-WHERE region = 'Europe'                      -- slice + roll-up insieme
+WHERE region = 'Europe'
 GROUP BY ROLLUP (sub_region)
 ORDER BY GROUPING(sub_region), mediana_reale DESC;
 
 
--- ------------------------------------------------------------
--- IL BRIDGE: attributo multi-valore
--- Salario reale mediano per linguaggio (>=200 rispondenti)
--- ------------------------------------------------------------
+-- D5: bridge, salario reale mediano per linguaggio, soglia 200 rispondenti
 SELECT l.language_name,
        count(*) AS n,
        round(percentile_cont(0.5) WITHIN GROUP (ORDER BY v.comp_adjusted)::numeric, 0) AS mediana_reale
@@ -88,11 +61,7 @@ ORDER BY mediana_reale DESC
 LIMIT 10;
 
 
--- ============================================================
--- BONUS 
--- ============================================================
-
--- B1 — Remote vs in-person per region (FILTER)
+-- B1: remote contro in person per region con FILTER
 SELECT g.region,
        round((percentile_cont(0.5) WITHIN GROUP (ORDER BY f.comp_adjusted)
               FILTER (WHERE r.work_mode = 'Remote'))::numeric, 0)    AS med_remote,
@@ -105,13 +74,13 @@ WHERE f.comp_adjusted IS NOT NULL
 GROUP BY g.region
 ORDER BY med_remote DESC;
 
--- B2 — La prova della riconciliazione ETL (errore Corea nel master)
+-- B2: verifica della riconciliazione ETL, errore Corea nel master
 SELECT country_name, alpha3, sub_region, region, col_index
 FROM dim_geography
 WHERE alpha3 IN ('KOR', 'PRK', 'USA', 'GBR', 'GEO')
 ORDER BY country_name;
 
--- B3 — Chi scala il ranking aggiustando per il costo della vita (window)
+-- B3: chi scala il ranking passando dal nominale al reale, window function
 WITH per_paese AS (
     SELECT country_name, count(*) AS n,
            percentile_cont(0.5) WITHIN GROUP (ORDER BY comp_usd)      AS med_usd,
