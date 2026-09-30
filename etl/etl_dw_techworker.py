@@ -1,6 +1,6 @@
 # ============================================================
-# ETL — Il Potere d'Acquisto del Tech Worker
-# Data Management A.A. 2025/26 — Emanuele Smisi, Fabrizio Pietrobono
+# ETL: Il Potere d'Acquisto del Tech Worker
+# Data Management A.A. 2025/26: Emanuele Smisi, Fabrizio Pietrobono
 #
 # Pipeline: EXTRACT (kagglehub) -> TRANSFORM (regole R1-R6, Fase 1)
 #           -> LOAD (star schema, Fase 3) -> QUALITY CHECK
@@ -312,7 +312,7 @@ with engine.connect() as conn:
     for label, q in QC.items():
         print(f"  {label}: {conn.execute(text(q)).scalar()}")
 
-    print("\n  Smoke test — Top 10 paesi per comp_adjusted mediano (>=30 risp.):")
+    print("\n  Smoke test: Top 10 paesi per comp_adjusted mediano (>=30 risp.):")
     smoke = pd.read_sql(text("""
         SELECT g.country_name,
                count(*)                                            AS n,

@@ -1,6 +1,6 @@
 <svg viewBox="0 0 1250 920" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
   <rect width="1250" height="920" fill="white"/>
-  <text x="625" y="40" text-anchor="middle" font-size="22" font-weight="bold">DFM — The Purchasing Power of the Tech Worker</text>
+  <text x="625" y="40" text-anchor="middle" font-size="22" font-weight="bold">DFM: The Purchasing Power of the Tech Worker</text>
   <text x="625" y="66" text-anchor="middle" font-size="14" fill="#555">Fact grain: one survey response (Stack Overflow Developer Survey 2024)</text>
 
   <!-- FACT -->
@@ -67,7 +67,7 @@
   <line x1="332" y1="514" x2="207" y2="514" stroke="#000" stroke-width="1.5"/>
   <circle cx="200" cy="514" r="6" fill="#fff" stroke="#000" stroke-width="1.5"/>
   <text x="200" y="535" text-anchor="middle" font-size="14">experience_band</text>
-  <text x="200" y="552" text-anchor="middle" font-size="11.5" fill="#777">Junior 0–2 · Mid 3–5 · Senior 6–10 · Expert 11+</text>
+  <text x="200" y="552" text-anchor="middle" font-size="11.5" fill="#777">Junior 0-2 · Mid 3-5 · Senior 6-10 · Expert 11+</text>
   <text x="268" y="482" text-anchor="middle" font-size="13" font-style="italic" fill="#777">EXPERIENCE</text>
 
   <!-- ORG SIZE (bottom-left) -->
@@ -92,9 +92,9 @@
 
   <!-- LEGEND -->
   <rect x="60" y="740" width="620" height="150" fill="#fafafa" stroke="#ccc"/>
-  <text x="75" y="765" font-size="13" font-weight="bold">Legend (DFM notation — Golfarelli/Rizzi, course slides)</text>
+  <text x="75" y="765" font-size="13" font-weight="bold">Legend (DFM notation: Golfarelli/Rizzi, course slides)</text>
   <circle cx="85" cy="787" r="5" fill="#fff" stroke="#000" stroke-width="1.5"/>
-  <text x="100" y="791" font-size="12.5">dimensional attribute — chains of circles are hierarchies: each arc is a many-to-one</text>
+  <text x="100" y="791" font-size="12.5">dimensional attribute: chains of circles are hierarchies: each arc is a many-to-one</text>
   <text x="100" y="807" font-size="12.5">functional dependency; roll-up moves away from the fact (country → sub_region → region)</text>
   <line x1="75" y1="825" x2="95" y2="825" stroke="#000" stroke-width="1"/>
   <text x="100" y="829" font-size="12.5"><tspan text-decoration="underline">underlined name</tspan> = descriptive attribute (describes a level, never used to aggregate)</text>

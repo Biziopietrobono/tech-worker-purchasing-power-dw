@@ -1,5 +1,5 @@
 # ============================================================
-# Live demo app — The Purchasing Power of the Tech Worker
+# Live demo app: The Purchasing Power of the Tech Worker
 # Streamlit + PostgreSQL (dw_techworker)
 # Run:  streamlit run demo_app.py
 # ============================================================
@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from sqlalchemy import create_engine, text
 
-st.set_page_config(page_title="Tech Worker DW — live", layout="wide")
+st.set_page_config(page_title="Tech Worker DW: live", layout="wide")
 
 DB_URL = "postgresql+psycopg2://emanuelesmisi@localhost:5432/dw_techworker"
 BORDEAUX = "#8C1D2F"
@@ -52,7 +52,7 @@ st.sidebar.title("Tech Worker DW")
 thr = st.sidebar.slider("Min respondents per country (rule R4)", 10, 200, 30, step=5)
 st.sidebar.caption(
     "The warehouse stores **all** facts at the finest grain. "
-    "This slider only changes the `HAVING` clause of the query — "
+    "This slider only changes the `HAVING` clause of the query: "
     "no reload, no ETL: analytical choices live at query time."
 )
 
@@ -77,7 +77,7 @@ with tab_map:
                       coloraxis_colorbar_title="median adj. $")
     st.plotly_chart(fig, use_container_width=True)
     st.caption(
-        "This map is drawn directly from the **ISO alpha-3 codes** in `dim_geography` — "
+        "This map is drawn directly from the **ISO alpha-3 codes** in `dim_geography`: "
         "it exists because every source was reconciled onto the canonical geographic master."
     )
     with st.expander("SQL under the hood"):
@@ -115,7 +115,7 @@ with tab_focus:
               delta=f"{gained:+d} vs nominal rank", delta_color="normal")
     c4.metric("Respondents", int(row["n"]))
     st.caption(
-        f"{country} — {row['region']}. "
+        f"{country}: {row['region']}. "
         "The rank delta is the whole project in one number: what cost of living gives or takes away."
     )
     with st.expander("SQL under the hood"):
