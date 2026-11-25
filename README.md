@@ -4,6 +4,10 @@
 
 **Authors:** Emanuele Smisi · Fabrizio Pietrobono
 
+## My role
+
+Two-person project with Emanuele Smisi: we worked on every part together, from the dimensional design to the ETL pipeline and the OLAP queries.
+
 ---
 
 ## Business question
